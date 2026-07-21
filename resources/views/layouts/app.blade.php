@@ -10,6 +10,7 @@
     <meta property="og:type" content="website">
     <title>@yield('title', 'Lindsay Masten')</title>
 
+    <link rel="icon" type="image/png" sizes="259x259" href="{{ asset('favicon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&amp;family=Sofia+Sans+Extra+Condensed:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
