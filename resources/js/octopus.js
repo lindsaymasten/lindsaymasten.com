@@ -18,10 +18,10 @@ async function createRenderBridge(canvas) {
         });
 
         worker.addEventListener('error', (event) => {
-            console.error('Mosaic octopus worker error:', event.message, event.error);
+            console.error('Ink octopus worker error:', event.message, event.error);
         });
         worker.addEventListener('messageerror', (event) => {
-            console.error('Mosaic octopus worker message error:', event.data);
+            console.error('Ink octopus worker message error:', event.data);
         });
 
         worker.postMessage({
@@ -53,8 +53,8 @@ async function createRenderBridge(canvas) {
         };
     }
 
-    const { createMosaicOctopusRenderer } = await import('./octopus/renderer.js');
-    const renderer = createMosaicOctopusRenderer(canvas, { frameRate: 60 });
+    const { createInkOctopusRenderer } = await import('./octopus/renderer.js');
+    const renderer = createInkOctopusRenderer(canvas, { frameRate: 60 });
 
     renderer.resize(viewport.width, viewport.height, viewport.density);
     renderer.start();
@@ -72,8 +72,8 @@ async function createRenderBridge(canvas) {
     };
 }
 
-export async function initMosaicOctopus() {
-    const layer = document.querySelector('[data-mosaic-octopus]');
+export async function initInkOctopus() {
+    const layer = document.querySelector('[data-ink-octopus]');
 
     if (!layer || layer.dataset.initialized === 'true') return;
 

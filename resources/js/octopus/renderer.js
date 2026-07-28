@@ -1,5 +1,5 @@
 import { CodepenArm, distanceBetween } from './motion.js';
-import { MosaicSkin } from './skin.js';
+import { InkSkin } from './skin.js';
 
 const TAU = Math.PI * 2;
 const ARM_CONFIGS = [
@@ -44,14 +44,14 @@ const cancelFrame = globalThis.cancelAnimationFrame
     ? (request) => globalThis.cancelAnimationFrame(request)
     : (request) => globalThis.clearTimeout(request);
 
-class MosaicOctopusRenderer {
+class InkOctopusRenderer {
     constructor(canvas, options = {}) {
         this.canvas = canvas;
         this.context = canvas.getContext('2d', {
             alpha: true,
             desynchronized: true,
         });
-        this.skin = new MosaicSkin(this.context);
+        this.skin = new InkSkin(this.context);
         this.frameRate = options.frameRate ?? 60;
         this.width = 1;
         this.height = 1;
@@ -592,6 +592,9 @@ class MosaicOctopusRenderer {
             center: this.body,
             forward,
             right,
+            phase: this.autonomousPhase,
+            energy: speedAmount,
+            reaction: this.reaction,
             length: this.mantleLength * (
                 1
                 + (speedAmount * 0.14)
@@ -632,6 +635,6 @@ class MosaicOctopusRenderer {
     }
 }
 
-export function createMosaicOctopusRenderer(canvas, options) {
-    return new MosaicOctopusRenderer(canvas, options);
+export function createInkOctopusRenderer(canvas, options) {
+    return new InkOctopusRenderer(canvas, options);
 }

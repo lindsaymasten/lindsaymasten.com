@@ -6,9 +6,9 @@ const savesData = navigator.connection?.saveData === true;
 if (!motionPreference.matches && !savesData) {
     const loadOctopus = () => {
         import('./octopus.js')
-            .then(({ initMosaicOctopus }) => initMosaicOctopus())
+            .then(({ initInkOctopus }) => initInkOctopus())
             .catch(() => {
-                document.querySelector('[data-mosaic-octopus]')?.setAttribute('hidden', '');
+                document.querySelector('[data-ink-octopus]')?.setAttribute('hidden', '');
             });
     };
 

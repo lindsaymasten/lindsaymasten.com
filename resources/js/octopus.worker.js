@@ -1,4 +1,4 @@
-import { createMosaicOctopusRenderer } from './octopus/renderer.js';
+import { createInkOctopusRenderer } from './octopus/renderer.js';
 
 let renderer = null;
 
@@ -6,7 +6,7 @@ self.addEventListener('message', (event) => {
     const message = event.data;
 
     if (message.type === 'init') {
-        renderer = createMosaicOctopusRenderer(message.canvas, { frameRate: 60 });
+        renderer = createInkOctopusRenderer(message.canvas, { frameRate: 60 });
         renderer.resize(message.width, message.height, message.density);
         renderer.start();
         return;

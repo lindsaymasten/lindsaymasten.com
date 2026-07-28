@@ -1,44 +1,19 @@
-import { MANTLE_TILES } from './mantle-template.js';
-
 const TAU = Math.PI * 2;
-const TILE_WHITE = '#fff8e8';
-const GROUT = '#e7d7ba';
-const EYE_BLACK = '#17110e';
-const TILE_SIZE = 6;
-const TILE_STEP = 6.45;
-// The animated splines place one consistent tessera scale. A small set of
-// authored pieces is cut at tight joins; there are no silhouette fills or
-// clipping masks in this renderer.
-const TILE_COLORS = [
-    '#681b16',
-    '#761f19',
-    '#84241c',
-    '#92291f',
-    '#a03225',
-    '#ad3c2a',
-    '#b84a31',
-];
-const MANTLE_PROFILE = [
-    [0, 0.64],
-    [0.1, 0.72],
-    [0.23, 0.84],
-    [0.4, 0.96],
-    [0.56, 1],
-    [0.68, 1],
-    [0.78, 0.94],
-];
+const INK = '#171513';
+const INK_SOFT = '#24201c';
+const INK_DRY = '#352f29';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (start, end, amount) => start + ((end - start) * amount);
+const smoothstep = (start, end, value) => {
+    const amount = clamp((value - start) / Math.max(0.0001, end - start), 0, 1);
+    return amount * amount * (3 - (2 * amount));
+};
 const pointBetween = (first, second, amount) => ({
     x: lerp(first.x, second.x, amount),
     y: lerp(first.y, second.y, amount),
 });
 const distance = (first, second) => Math.hypot(second.x - first.x, second.y - first.y);
-const smoothstep = (start, end, value) => {
-    const amount = clamp((value - start) / Math.max(0.0001, end - start), 0, 1);
-    return amount * amount * (3 - (2 * amount));
-};
 const vectorAt = (angle, length = 1) => ({
     x: Math.cos(angle) * length,
     y: Math.sin(angle) * length,
@@ -47,83 +22,15 @@ const normalize = (x, y) => {
     const magnitude = Math.max(0.0001, Math.hypot(x, y));
     return { x: x / magnitude, y: y / magnitude };
 };
-
-function colorFor(seed) {
-    const value = Math.abs(Math.sin((seed + 1) * 91.733) * 10000);
-    return TILE_COLORS[Math.floor(value) % TILE_COLORS.length];
-}
-
-function variation(seed, amplitude) {
-    return ((Math.abs(Math.sin((seed + 7) * 37.719)) % 1) - 0.5) * amplitude;
-}
-
-function mantleProfile(progress) {
-    const amount = clamp(progress, 0, 1);
-
-    if (amount >= 0.78) {
-        const cap = (amount - 0.78) / 0.22;
-        return 0.95 * Math.sqrt(Math.max(0, 1 - (cap ** 2)));
-    }
-
-    for (let index = 1; index < MANTLE_PROFILE.length; index += 1) {
-        const [endProgress, endWidth] = MANTLE_PROFILE[index];
-
-        if (amount <= endProgress) {
-            const [startProgress, startWidth] = MANTLE_PROFILE[index - 1];
-            return lerp(
-                startWidth,
-                endWidth,
-                smoothstep(startProgress, endProgress, amount),
-            );
-        }
-    }
-
-    return MANTLE_PROFILE[MANTLE_PROFILE.length - 1][1];
-}
-
-function localPoint(center, forward, right, along, across) {
-    return {
-        x: center.x + (forward.x * along) + (right.x * across),
-        y: center.y + (forward.y * along) + (right.y * across),
-    };
-}
-
-function drawTile(context, center, angle, fill, scale, cut = null) {
-    const half = (TILE_SIZE * scale) / 2;
-    const along = vectorAt(angle, half * (cut?.length ?? 1));
-    const acrossAngle = angle + (Math.PI / 2);
-    const startAcross = vectorAt(acrossAngle, half * (cut?.startWidth ?? 1));
-    const endAcross = vectorAt(acrossAngle, half * (cut?.endWidth ?? 1));
-    const points = [
-        {
-            x: center.x - along.x - startAcross.x,
-            y: center.y - along.y - startAcross.y,
-        },
-        {
-            x: center.x + along.x - endAcross.x,
-            y: center.y + along.y - endAcross.y,
-        },
-        {
-            x: center.x + along.x + endAcross.x,
-            y: center.y + along.y + endAcross.y,
-        },
-        {
-            x: center.x - along.x + startAcross.x,
-            y: center.y - along.y + startAcross.y,
-        },
-    ];
-
-    context.beginPath();
-    context.moveTo(points[0].x, points[0].y);
-    points.slice(1).forEach((point) => context.lineTo(point.x, point.y));
-    context.closePath();
-    context.fillStyle = fill;
-    context.fill();
-    context.strokeStyle = GROUT;
-    context.lineWidth = 0.56 * scale;
-    context.lineJoin = 'round';
-    context.stroke();
-}
+const localPoint = (center, forward, right, along, across) => ({
+    x: center.x + (forward.x * along) + (right.x * across),
+    y: center.y + (forward.y * along) + (right.y * across),
+});
+const noise = (seed) => {
+    const value = Math.sin((seed + 1.731) * 78.233) * 43758.5453;
+    return value - Math.floor(value);
+};
+const signedNoise = (seed) => (noise(seed) * 2) - 1;
 
 function softenPolyline(points, iterations = 2) {
     let softened = points.map((point) => ({ ...point }));
@@ -165,7 +72,7 @@ function resamplePolyline(points, count) {
     let segment = 1;
 
     for (let index = 0; index < count; index += 1) {
-        const target = total * (index / (count - 1));
+        const target = total * (index / Math.max(1, count - 1));
 
         while (segment < cumulative.length - 1 && cumulative[segment] < target) {
             segment += 1;
@@ -181,106 +88,11 @@ function resamplePolyline(points, count) {
     return result;
 }
 
-function drawTilePath(
-    context,
-    points,
-    fill,
-    scale,
-    seedOffset = 0,
-    closed = false,
-    cutFor = null,
-) {
-    if (points.length === 0) return;
-
-    if (points.length === 1) {
-        const tileFill = typeof fill === 'function' ? fill(seedOffset, 0) : fill;
-        drawTile(context, points[0], 0, tileFill, scale);
-        return;
-    }
-
-    const source = closed ? [...points, points[0]] : points;
-    const segments = Math.max(
-        1,
-        Math.round(polylineLength(source) / (TILE_STEP * scale)),
-    );
-    const sampled = resamplePolyline(source, segments + 1);
-    const tileCount = closed ? segments : segments + 1;
-
-    for (let index = 0; index < tileCount; index += 1) {
-        const previous = closed
-            ? sampled[index === 0 ? tileCount - 1 : index - 1]
-            : sampled[Math.max(0, index - 1)];
-        const next = closed
-            ? sampled[index === tileCount - 1 ? 0 : index + 1]
-            : sampled[Math.min(tileCount - 1, index + 1)];
-        const seed = seedOffset + (index * 17);
-        const tileFill = typeof fill === 'function' ? fill(seed, index) : fill;
-        const cut = typeof cutFor === 'function'
-            ? cutFor(index, tileCount)
-            : cutFor;
-        const angle = Math.atan2(next.y - previous.y, next.x - previous.x)
-            + variation(seed + 5, 0.035);
-
-        drawTile(context, sampled[index], angle, tileFill, scale, cut);
-    }
-}
-
-function quadraticCurve(start, control, end, count = 17) {
-    return Array.from({ length: count }, (_, index) => {
-        const progress = index / (count - 1);
-        const inverse = 1 - progress;
-
-        return {
-            x: (inverse * inverse * start.x)
-                + (2 * inverse * progress * control.x)
-                + (progress * progress * end.x),
-            y: (inverse * inverse * start.y)
-                + (2 * inverse * progress * control.y)
-                + (progress * progress * end.y),
-        };
-    });
-}
-
-function ellipsePath(center, forward, right, alongRadius, acrossRadius, count = 72) {
-    return Array.from({ length: count }, (_, index) => {
-        const angle = (index / count) * TAU;
-
-        return localPoint(
-            center,
-            forward,
-            right,
-            Math.cos(angle) * alongRadius,
-            Math.sin(angle) * acrossRadius,
-        );
-    });
-}
-
-function authoredLocalPath(center, forward, right, coordinates, scale) {
-    return coordinates.map(([along, across]) => localPoint(
-        center,
-        forward,
-        right,
-        along * scale,
-        across * scale,
-    ));
-}
-
-function centerOutOffsets(maximum, step) {
-    const offsets = [0];
-    const count = Math.floor(maximum / step);
-
-    for (let index = 1; index <= count; index += 1) {
-        offsets.push(-index * step, index * step);
-    }
-
-    return offsets;
-}
-
 function shapeTerminalCurve(points, tipAngle) {
     if (!Number.isFinite(tipAngle) || points.length < 9) return points;
 
     const shaped = points.map((point) => ({ ...point }));
-    const startIndex = Math.floor((points.length - 1) * 0.74);
+    const startIndex = Math.floor((points.length - 1) * 0.72);
     const start = points[startIndex];
     const before = points[Math.max(0, startIndex - 2)];
     const end = points[points.length - 1];
@@ -291,18 +103,18 @@ function shapeTerminalCurve(points, tipAngle) {
         Math.sin(tipAngle - chordAngle),
         Math.cos(tipAngle - chordAngle),
     );
-    const endTangent = vectorAt(chordAngle + clamp(requestedTurn, -0.96, 0.96));
-    const startMagnitude = span * 0.72;
-    const endMagnitude = span * 0.28;
+    const endTangent = vectorAt(chordAngle + clamp(requestedTurn, -1.08, 1.08));
+    const startMagnitude = span * 0.76;
+    const endMagnitude = span * 0.25;
 
     for (let index = startIndex; index < points.length; index += 1) {
         const amount = (index - startIndex) / Math.max(1, points.length - 1 - startIndex);
-        const amountSquared = amount * amount;
-        const amountCubed = amountSquared * amount;
-        const startWeight = (2 * amountCubed) - (3 * amountSquared) + 1;
-        const startTangentWeight = amountCubed - (2 * amountSquared) + amount;
-        const endWeight = (-2 * amountCubed) + (3 * amountSquared);
-        const endTangentWeight = amountCubed - amountSquared;
+        const squared = amount * amount;
+        const cubed = squared * amount;
+        const startWeight = (2 * cubed) - (3 * squared) + 1;
+        const startTangentWeight = cubed - (2 * squared) + amount;
+        const endWeight = (-2 * cubed) + (3 * squared);
+        const endTangentWeight = cubed - squared;
 
         shaped[index] = {
             x: (startWeight * start.x)
@@ -319,18 +131,13 @@ function shapeTerminalCurve(points, tipAngle) {
     return shaped;
 }
 
-function shapeOccasionalCurl(
-    points,
-    curlAmount = 0,
-    curlDirection = 1,
-    broadCurl = false,
-) {
+function shapeOccasionalCurl(points, curlAmount = 0, curlDirection = 1, broadCurl = false) {
     const amount = clamp(curlAmount, 0, 1);
 
     if (amount < 0.01 || points.length < 12) return points;
 
     const shaped = points.map((point) => ({ ...point }));
-    const startIndex = Math.floor((points.length - 1) * (broadCurl ? 0.46 : 0.64));
+    const startIndex = Math.floor((points.length - 1) * (broadCurl ? 0.44 : 0.61));
     const start = points[startIndex];
     const next = points[Math.min(points.length - 1, startIndex + 2)];
     const startTangent = Math.atan2(next.y - start.y, next.x - start.x);
@@ -338,13 +145,13 @@ function shapeOccasionalCurl(
     const tailLength = Math.max(1, polylineLength(tail));
     const stepLength = tailLength / Math.max(1, tail.length - 1);
     const direction = curlDirection < 0 ? -1 : 1;
-    const totalTurn = Math.PI * (broadCurl ? 1.58 : 1.22);
+    const totalTurn = Math.PI * (broadCurl ? 1.72 : 1.38);
     const curled = [{ ...start }];
 
     for (let index = 1; index < tail.length; index += 1) {
         const progress = index / Math.max(1, tail.length - 1);
-        const turn = direction * totalTurn * (progress ** 1.42);
-        const taper = 1 - ((broadCurl ? 0.43 : 0.34) * progress);
+        const turn = direction * totalTurn * (progress ** 1.38);
+        const taper = 1 - ((broadCurl ? 0.46 : 0.36) * progress);
         const previous = curled[index - 1];
 
         curled.push({
@@ -355,10 +162,9 @@ function shapeOccasionalCurl(
 
     for (let index = startIndex; index < points.length; index += 1) {
         const progress = (index - startIndex) / Math.max(1, points.length - 1 - startIndex);
-        const blend = amount * smoothstep(0, 0.16, progress);
-        const curlPoint = curled[index - startIndex];
+        const blend = amount * smoothstep(0, 0.17, progress);
 
-        shaped[index] = pointBetween(points[index], curlPoint, blend);
+        shaped[index] = pointBetween(points[index], curled[index - startIndex], blend);
     }
 
     return shaped;
@@ -366,7 +172,7 @@ function shapeOccasionalCurl(
 
 function armFrames(points, halfWidth, scale, arm) {
     const terminalCurve = shapeTerminalCurve(
-        resamplePolyline(softenPolyline(points), 55),
+        resamplePolyline(softenPolyline(points), 58),
         arm.tipAngle,
     );
     const centerline = shapeOccasionalCurl(
@@ -379,18 +185,110 @@ function armFrames(points, halfWidth, scale, arm) {
     return centerline.map((point, index) => {
         const previous = centerline[Math.max(0, index - 1)];
         const next = centerline[Math.min(centerline.length - 1, index + 1)];
-        const progress = index / (centerline.length - 1);
+        const progress = index / Math.max(1, centerline.length - 1);
         const tangent = Math.atan2(next.y - previous.y, next.x - previous.x);
         const normal = vectorAt(tangent + (Math.PI / 2));
-        const rootFlare = 1 + (0.04 * (1 - smoothstep(0, 0.2, progress)));
-        const taper = 1 - (0.66 * (progress ** 1.7));
-        const width = Math.max(5.1 * scale, halfWidth * rootFlare * taper);
+        const rootFlare = 1 + (0.12 * (1 - smoothstep(0, 0.24, progress)));
+        const taper = 1 - (0.78 * (progress ** 1.54));
+        const pulse = 1 + (Math.sin((progress * 11.5) + arm.config.phase) * 0.022);
+        const width = Math.max(2.2 * scale, halfWidth * rootFlare * taper * pulse);
 
         return { point, tangent, normal, width, progress };
     });
 }
 
-export class MosaicSkin {
+function traceSmoothPath(context, points, close = false) {
+    if (points.length === 0) return;
+
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+
+    for (let index = 1; index < points.length - 1; index += 1) {
+        const midpoint = pointBetween(points[index], points[index + 1], 0.5);
+        context.quadraticCurveTo(points[index].x, points[index].y, midpoint.x, midpoint.y);
+    }
+
+    const last = points[points.length - 1];
+    context.lineTo(last.x, last.y);
+
+    if (close) context.closePath();
+}
+
+function traceArm(context, frames, seed, scale) {
+    const left = [];
+    const right = [];
+
+    frames.forEach((frame, index) => {
+        const contour = signedNoise(seed + (index * 19.7)) * (1.25 + (0.72 * scale));
+        const pressure = 1 + (signedNoise(seed + (index * 7.1)) * 0.025);
+        const width = Math.max(1.6 * scale, (frame.width * pressure) + contour);
+
+        left.push({
+            x: frame.point.x + (frame.normal.x * width),
+            y: frame.point.y + (frame.normal.y * width),
+        });
+        right.push({
+            x: frame.point.x - (frame.normal.x * width),
+            y: frame.point.y - (frame.normal.y * width),
+        });
+    });
+
+    traceSmoothPath(context, [...left, ...right.reverse()], true);
+}
+
+function traceMantle(context, visual, scale) {
+    const left = [];
+    const right = [];
+    const samples = 34;
+
+    for (let index = 0; index <= samples; index += 1) {
+        const progress = index / samples;
+        const profile = progress < 0.72
+            ? lerp(0.58, 1, smoothstep(0, 0.62, progress))
+            : Math.sqrt(Math.max(0, 1 - (((progress - 0.72) / 0.28) ** 2)));
+        const asymmetry = Math.sin((progress * 4.9) + visual.phase) * 0.045;
+        const bend = visual.bend * (Math.sin(progress * Math.PI) ** 1.3);
+        const along = (4 * scale) + (visual.length * progress);
+        const leftWidth = visual.width * profile * (1 + asymmetry);
+        const rightWidth = visual.width * profile * (1 - (asymmetry * 0.66));
+        const contour = signedNoise(8100 + (index * 13)) * 1.55 * scale;
+
+        left.push(localPoint(
+            visual.center,
+            visual.forward,
+            visual.right,
+            along + (signedNoise(9100 + index) * 0.5 * scale),
+            -leftWidth + bend - contour,
+        ));
+        right.push(localPoint(
+            visual.center,
+            visual.forward,
+            visual.right,
+            along + (signedNoise(10100 + index) * 0.5 * scale),
+            rightWidth + bend + contour,
+        ));
+    }
+
+    traceSmoothPath(context, [...left, ...right.reverse()], true);
+}
+
+function drawIrregularOval(context, center, rotation, radiusX, radiusY, seed) {
+    const points = Array.from({ length: 18 }, (_, index) => {
+        const angle = (index / 18) * TAU;
+        const wobble = 1 + (signedNoise(seed + (index * 3.7)) * 0.11);
+        const x = Math.cos(angle) * radiusX * wobble;
+        const y = Math.sin(angle) * radiusY * wobble;
+
+        return {
+            x: center.x + (x * Math.cos(rotation)) - (y * Math.sin(rotation)),
+            y: center.y + (x * Math.sin(rotation)) + (y * Math.cos(rotation)),
+        };
+    });
+
+    traceSmoothPath(context, points, true);
+}
+
+export class InkSkin {
     constructor(context) {
         this.context = context;
         this.scale = 1;
@@ -409,469 +307,340 @@ export class MosaicSkin {
 
     drawArm(prepared) {
         const { arm, frames } = prepared;
-        const step = TILE_STEP * this.scale;
-        const halfDiagonal = (TILE_SIZE * this.scale) / Math.sqrt(2);
-        const maximumWidth = Math.max(...frames.map((frame) => frame.width));
-        const offsets = centerOutOffsets(maximumWidth - halfDiagonal, step);
+        const seed = 1000 + (arm.index * 311) + ((arm.stepIndex ?? 0) * 17);
 
-        offsets.forEach((offset, lane) => {
-            const points = frames
-                .filter((frame) => Math.abs(offset) + halfDiagonal <= frame.width)
-                .map((frame) => ({
-                    x: frame.point.x + (frame.normal.x * offset),
-                    y: frame.point.y + (frame.normal.y * offset),
-                }));
+        this.context.save();
+        traceArm(this.context, frames, seed, this.scale);
+        this.context.fillStyle = arm.index % 3 === 0 ? INK_SOFT : INK;
+        this.context.fill();
 
-            if (points.length === 0) return;
+        traceArm(this.context, frames, seed, this.scale);
+        this.context.clip();
+        this.drawArmDryBrush(frames, seed);
+        this.context.restore();
 
-            drawTilePath(
-                this.context,
-                points,
-                (seed) => colorFor(seed),
-                this.scale,
-                (arm.index * 10000) + (lane * 601),
+        this.drawSuckers(arm, frames, seed);
+    }
+
+    drawArmDryBrush(frames, seed) {
+        this.context.save();
+        this.context.globalCompositeOperation = 'destination-out';
+        this.context.lineCap = 'round';
+
+        for (let lane = -1; lane <= 1; lane += 1) {
+            const offsetFactor = lane * 0.31;
+            const start = 5 + ((lane + 1) * 3);
+            const points = frames.slice(start, frames.length - 4).map((frame, index) => {
+                const skip = 0.58 + (noise(seed + (index * 7) + lane) * 0.42);
+                return {
+                    x: frame.point.x
+                        + (frame.normal.x * frame.width * offsetFactor * skip),
+                    y: frame.point.y
+                        + (frame.normal.y * frame.width * offsetFactor * skip),
+                };
+            });
+
+            traceSmoothPath(this.context, points);
+            this.context.globalAlpha = lane === 0 ? 0.16 : 0.24;
+            this.context.lineWidth = (lane === 0 ? 1.6 : 0.9) * this.scale;
+            this.context.stroke();
+        }
+
+        for (let index = 5; index < frames.length - 4; index += 6) {
+            const frame = frames[index];
+            const across = signedNoise(seed + (index * 17)) * frame.width * 0.55;
+            const length = (2.2 + (noise(seed + index) * 5.4)) * this.scale;
+            const center = {
+                x: frame.point.x + (frame.normal.x * across),
+                y: frame.point.y + (frame.normal.y * across),
+            };
+
+            this.context.beginPath();
+            this.context.moveTo(
+                center.x - (Math.cos(frame.tangent) * length),
+                center.y - (Math.sin(frame.tangent) * length),
             );
-        });
+            this.context.lineTo(
+                center.x + (Math.cos(frame.tangent) * length),
+                center.y + (Math.sin(frame.tangent) * length),
+            );
+            this.context.globalAlpha = 0.18 + (noise(seed + index + 9) * 0.36);
+            this.context.lineWidth = (0.45 + (noise(seed + index + 3) * 1.2)) * this.scale;
+            this.context.stroke();
+        }
 
-        this.drawTentacleLine(arm, frames);
+        this.context.restore();
     }
 
-    tentacleLinePoint(arm, frame) {
-        const offset = frame.width * 0.53 * arm.config.suckerSide;
+    drawSuckers(arm, frames, seed) {
+        this.context.save();
+        this.context.globalCompositeOperation = 'destination-out';
+        this.context.strokeStyle = '#000';
+        this.context.lineCap = 'round';
 
-        return {
-            x: frame.point.x + (frame.normal.x * offset),
-            y: frame.point.y + (frame.normal.y * offset),
-        };
-    }
+        for (let index = 9; index < frames.length - 2; index += 3) {
+            const frame = frames[index];
+            if (frame.width < 3.1 * this.scale) continue;
 
-    drawTentacleLine(arm, frames, startIndex = 0, endIndex = frames.length - 1) {
-        const firstIndex = clamp(startIndex, 0, frames.length - 2);
-        const lastIndex = clamp(endIndex, firstIndex + 1, frames.length - 1);
-        const points = frames
-            .slice(firstIndex, lastIndex + 1)
-            .map((frame) => this.tentacleLinePoint(arm, frame));
+            const side = arm.config.suckerSide;
+            const offset = frame.width * (0.57 + (signedNoise(seed + index) * 0.055)) * side;
+            const center = {
+                x: frame.point.x + (frame.normal.x * offset),
+                y: frame.point.y + (frame.normal.y * offset),
+            };
+            const radius = clamp(frame.width * 0.25, 1.05 * this.scale, 3.7 * this.scale);
+            const stretch = 1.1 + (noise(seed + (index * 2)) * 0.36);
 
-        drawTilePath(
-            this.context,
-            points,
-            TILE_WHITE,
-            this.scale,
-            70000 + (arm.index * 1000) + firstIndex,
-        );
-    }
+            drawIrregularOval(
+                this.context,
+                center,
+                frame.tangent + (signedNoise(seed + index + 4) * 0.17),
+                radius * stretch,
+                radius * 0.72,
+                seed + (index * 29),
+            );
+            this.context.globalAlpha = 0.78 + (noise(seed + index) * 0.2);
+            this.context.lineWidth = clamp(radius * 0.5, 0.8, 1.8) * this.scale;
+            this.context.stroke();
+        }
 
-    drawRootTentacleLine(prepared) {
-        this.drawTentacleLine(
-            prepared.arm,
-            prepared.frames,
-            0,
-            Math.min(8, prepared.frames.length - 1),
-        );
-    }
-
-    drawFrontBridge(preparedArms, center, heading) {
-        const first = preparedArms.find(({ arm }) => arm.index === 3);
-        const second = preparedArms.find(({ arm }) => arm.index === 4);
-
-        if (!first || !second) return;
-
-        const firstFrame = first.frames[Math.min(2, first.frames.length - 1)];
-        const secondFrame = second.frames[Math.min(2, second.frames.length - 1)];
-        const start = this.tentacleLinePoint(first.arm, firstFrame);
-        const end = this.tentacleLinePoint(second.arm, secondFrame);
-        const forward = vectorAt(heading);
-        const right = { x: -forward.y, y: forward.x };
-        const control = localPoint(center, forward, right, -47 * this.scale, 0);
-
-        drawTilePath(
-            this.context,
-            quadraticCurve(start, control, end),
-            TILE_WHITE,
-            this.scale,
-            78000,
-        );
+        this.context.restore();
     }
 
     drawWeb(center, heading) {
         const forward = vectorAt(heading);
         const right = { x: -forward.y, y: forward.x };
-        const step = TILE_STEP * this.scale;
-        const focus = localPoint(center, forward, right, 4 * this.scale, 0);
+        const points = Array.from({ length: 28 }, (_, index) => {
+            const angle = (index / 28) * TAU;
+            const radius = (42 + (signedNoise(2200 + (index * 9)) * 4.6)) * this.scale;
+            const along = Math.cos(angle) * radius * 0.88;
+            const across = Math.sin(angle) * radius;
 
-        drawTile(this.context, focus, heading, colorFor(12000), this.scale);
+            return localPoint(center, forward, right, along, across);
+        });
 
-        for (let ring = 1; ring <= 9; ring += 1) {
-            const loopCenter = localPoint(
-                focus,
-                forward,
-                right,
-                -ring * 0.65 * this.scale,
-                Math.sin(ring * 0.71) * 0.55 * this.scale,
-            );
-            const path = ellipsePath(
-                loopCenter,
-                forward,
-                right,
-                Math.min(48 * this.scale, ring * step * 0.9),
-                Math.min(53 * this.scale, ring * step),
-            );
-
-            drawTilePath(
-                this.context,
-                path,
-                (seed) => colorFor(seed),
-                this.scale,
-                12000 + (ring * 701),
-                true,
-            );
-        }
+        traceSmoothPath(this.context, points, true);
+        this.context.fillStyle = INK;
+        this.context.fill();
     }
 
-    mantlePoint(visual, across, progress) {
-        const profile = mantleProfile(progress);
-        const halfWidth = visual.width * profile;
-        const along = (8 * this.scale) + (visual.length * progress);
-        const bend = visual.bend * (Math.sin(Math.PI * progress) ** 1.25);
-
-        return localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            along,
-            (halfWidth * across) + bend,
-        );
+    drawRootTentacleLine() {
+        // Root details are integrated into each deforming sucker row.
     }
 
-    mantleTemplatePoint(visual, across, progress) {
-        const along = (8 * this.scale) + (visual.length * progress);
-        const bend = visual.bend * (Math.sin(Math.PI * progress) ** 1.25);
-
-        return localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            along,
-            (visual.width * across) + bend,
-        );
+    drawFrontBridge() {
+        // The irregular web provides the shared gestural bridge between arms.
     }
 
     drawMantle(visual) {
-        const heading = Math.atan2(visual.forward.y, visual.forward.x);
+        this.context.save();
+        traceMantle(this.context, visual, this.scale);
+        this.context.fillStyle = INK;
+        this.context.fill();
 
-        MANTLE_TILES.forEach(([progress, across, localAngle, cutClass], index) => {
-            const seed = 14000 + (index * 37);
-            let cut = null;
+        traceMantle(this.context, visual, this.scale);
+        this.context.clip();
+        this.drawMantleTexture(visual);
+        this.context.restore();
 
-            if (cutClass === 1) {
-                cut = index % 2 === 0
-                    ? { length: 0.82, startWidth: 0.72, endWidth: 0.94 }
-                    : { length: 0.82, startWidth: 0.94, endWidth: 0.72 };
-            } else if (cutClass === 2) {
-                cut = index % 2 === 0
-                    ? { length: 0.66, startWidth: 0.5, endWidth: 0.86 }
-                    : { length: 0.66, startWidth: 0.86, endWidth: 0.5 };
-            }
-
-            drawTile(
-                this.context,
-                this.mantleTemplatePoint(visual, across, progress),
-                heading + localAngle + variation(seed, 0.008),
-                colorFor(seed),
-                this.scale,
-                cut,
-            );
-        });
-
-        const edgeSamples = 36;
-        const leftEdge = Array.from({ length: edgeSamples + 1 }, (_, index) => (
-            this.mantlePoint(visual, -1, index / edgeSamples)
-        ));
-        const rightEdge = Array.from({ length: edgeSamples + 1 }, (_, index) => (
-            this.mantlePoint(visual, 1, index / edgeSamples)
-        ));
-
-        drawTilePath(this.context, leftEdge, TILE_WHITE, this.scale, 41000);
-        drawTilePath(this.context, rightEdge, TILE_WHITE, this.scale, 43000);
-        this.drawEyeConnections(visual);
+        this.drawMantleOpenings(visual);
         this.drawEyes(visual);
+        this.drawSplatter(visual);
     }
 
-    drawEyeConnections(visual) {
-        const eyeAcross = 28.5 * this.scale;
-        const innerLowerEnds = [];
+    drawMantleTexture(visual) {
+        const heading = Math.atan2(visual.forward.y, visual.forward.x);
 
-        [-1, 1].forEach((side) => {
-            const eyeCenter = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                0,
-                eyeAcross * side,
-            );
-            const mantleAnchor = this.mantlePoint(visual, side, 0.025);
-            const eyeTopOuter = localPoint(
-                eyeCenter,
-                visual.forward,
-                visual.right,
-                20.5 * this.scale,
-                7.5 * this.scale * side,
-            );
-            const upperOuterControl = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                19 * this.scale,
-                34 * this.scale * side,
-            );
-            const upperInnerStart = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                14 * this.scale,
-                8.5 * this.scale * side,
-            );
-            const eyeTopInner = localPoint(
-                eyeCenter,
-                visual.forward,
-                visual.right,
-                20.5 * this.scale,
-                -7 * this.scale * side,
-            );
-            const upperInnerControl = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                21 * this.scale,
-                14 * this.scale * side,
-            );
-            const eyeBottomOuter = localPoint(
-                eyeCenter,
-                visual.forward,
-                visual.right,
-                -20.5 * this.scale,
-                7 * this.scale * side,
-            );
-            const lowerOuterEnd = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                -34 * this.scale,
-                40 * this.scale * side,
-            );
-            const lowerOuterControl = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                -27 * this.scale,
-                35 * this.scale * side,
-            );
-            const eyeBottomInner = localPoint(
-                eyeCenter,
-                visual.forward,
-                visual.right,
-                -20.5 * this.scale,
-                -7 * this.scale * side,
-            );
-            const innerLowerEnd = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                -27 * this.scale,
-                10 * this.scale * side,
-            );
-            const lowerInnerControl = localPoint(
-                visual.center,
-                visual.forward,
-                visual.right,
-                -24 * this.scale,
-                16 * this.scale * side,
-            );
+        this.context.save();
+        this.context.globalCompositeOperation = 'destination-out';
+        this.context.lineCap = 'round';
 
-            drawTilePath(
-                this.context,
-                quadraticCurve(mantleAnchor, upperOuterControl, eyeTopOuter),
-                TILE_WHITE,
-                this.scale,
-                52000 + (side * 101),
+        for (let index = 0; index < 13; index += 1) {
+            const progress = 0.12 + (index * 0.058);
+            const center = localPoint(
+                visual.center,
+                visual.forward,
+                visual.right,
+                visual.length * progress,
+                visual.bend * Math.sin(progress * Math.PI),
             );
-            drawTilePath(
-                this.context,
-                quadraticCurve(upperInnerStart, upperInnerControl, eyeTopInner),
-                TILE_WHITE,
-                this.scale,
-                53000 + (side * 101),
-            );
-            drawTilePath(
-                this.context,
-                quadraticCurve(eyeBottomOuter, lowerOuterControl, lowerOuterEnd),
-                TILE_WHITE,
-                this.scale,
-                54000 + (side * 101),
-            );
-            drawTilePath(
-                this.context,
-                quadraticCurve(eyeBottomInner, lowerInnerControl, innerLowerEnd),
-                TILE_WHITE,
-                this.scale,
-                55000 + (side * 101),
-            );
+            const radiusX = (4 + (noise(3400 + index) * 13)) * this.scale;
+            const radiusY = (0.5 + (noise(3500 + index) * 1.4)) * this.scale;
 
-            innerLowerEnds.push(innerLowerEnd);
-        });
+            drawIrregularOval(
+                this.context,
+                center,
+                heading + (signedNoise(3600 + index) * 0.23),
+                radiusX,
+                radiusY,
+                3700 + index,
+            );
+            this.context.globalAlpha = 0.08 + (noise(3800 + index) * 0.27);
+            this.context.fill();
+        }
 
-        drawTilePath(
-            this.context,
-            quadraticCurve(
-                innerLowerEnds[0],
-                localPoint(
-                    visual.center,
-                    visual.forward,
-                    visual.right,
-                    -31 * this.scale,
-                    0,
-                ),
-                innerLowerEnds[1],
-            ),
-            TILE_WHITE,
-            this.scale,
-            57000,
+        for (let index = 0; index < 56; index += 1) {
+            const progress = 0.08 + (noise(4300 + index) * 0.84);
+            const widthAtPoint = visual.width * (Math.sin(progress * Math.PI) ** 0.55);
+            const across = signedNoise(4400 + index) * widthAtPoint * 0.78;
+            const center = localPoint(
+                visual.center,
+                visual.forward,
+                visual.right,
+                visual.length * progress,
+                across + (visual.bend * Math.sin(progress * Math.PI)),
+            );
+            const radius = (0.3 + (noise(4500 + index) * 1.05)) * this.scale;
+
+            this.context.beginPath();
+            this.context.arc(center.x, center.y, radius, 0, TAU);
+            this.context.globalAlpha = 0.12 + (noise(4600 + index) * 0.42);
+            this.context.fill();
+        }
+
+        this.context.restore();
+    }
+
+    drawMantleOpenings(visual) {
+        const heading = Math.atan2(visual.forward.y, visual.forward.x);
+        const loopCenter = localPoint(
+            visual.center,
+            visual.forward,
+            visual.right,
+            visual.length * 0.57,
+            (visual.width * -0.08) + (visual.bend * 0.72),
         );
+
+        this.context.save();
+        this.context.globalCompositeOperation = 'destination-out';
+        this.context.strokeStyle = '#000';
+        this.context.lineCap = 'round';
+        this.context.beginPath();
+        this.context.ellipse(
+            loopCenter.x,
+            loopCenter.y,
+            visual.length * 0.19,
+            visual.width * 0.39,
+            heading + 0.08,
+            0.16 * Math.PI,
+            1.78 * Math.PI,
+        );
+        this.context.globalAlpha = 0.88;
+        this.context.lineWidth = (4.8 + (visual.energy * 1.8)) * this.scale;
+        this.context.stroke();
+
+        const slashStart = localPoint(
+            visual.center,
+            visual.forward,
+            visual.right,
+            visual.length * 0.2,
+            visual.width * 0.23,
+        );
+        const slashEnd = localPoint(
+            visual.center,
+            visual.forward,
+            visual.right,
+            visual.length * 0.46,
+            visual.width * 0.42,
+        );
+
+        this.context.beginPath();
+        this.context.moveTo(slashStart.x, slashStart.y);
+        this.context.quadraticCurveTo(
+            loopCenter.x - (visual.forward.x * 8 * this.scale),
+            loopCenter.y - (visual.forward.y * 8 * this.scale),
+            slashEnd.x,
+            slashEnd.y,
+        );
+        this.context.globalAlpha = 0.55;
+        this.context.lineWidth = 1.4 * this.scale;
+        this.context.stroke();
+        this.context.restore();
     }
 
     drawEyes(visual) {
-        const eyeAcross = 28.5 * this.scale;
-        const left = localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            0,
-            -eyeAcross,
-        );
-        const right = localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            0,
-            eyeAcross,
-        );
+        const heading = Math.atan2(visual.forward.y, visual.forward.x);
+        const eyeAlong = 4 * this.scale;
+        const eyeAcross = 22.5 * this.scale;
 
-        this.drawEye(left, visual.forward, visual.right, 0, -1);
-        this.drawEye(right, visual.forward, visual.right, 1, 1);
+        [-1, 1].forEach((side, index) => {
+            const center = localPoint(
+                visual.center,
+                visual.forward,
+                visual.right,
+                eyeAlong + (index * 1.8 * this.scale),
+                eyeAcross * side,
+            );
+            const radiusX = (10.2 + (index * 0.9)) * this.scale;
+            const radiusY = (5.1 - (index * 0.35)) * this.scale;
+
+            this.context.save();
+            this.context.globalCompositeOperation = 'destination-out';
+            drawIrregularOval(
+                this.context,
+                center,
+                heading + (side * 0.08),
+                radiusX,
+                radiusY,
+                5200 + (index * 100),
+            );
+            this.context.fill();
+            this.context.restore();
+
+            const pupil = localPoint(
+                center,
+                visual.forward,
+                visual.right,
+                radiusX * 0.13,
+                side * radiusY * 0.08,
+            );
+
+            this.context.beginPath();
+            this.context.ellipse(
+                pupil.x,
+                pupil.y,
+                radiusY * 0.34,
+                radiusY * 0.54,
+                heading + (side * 0.13),
+                0,
+                TAU,
+            );
+            this.context.fillStyle = INK_DRY;
+            this.context.fill();
+        });
     }
 
-    drawEye(center, forward, right, eyeIndex, side) {
-        const hand = side * 0.55;
-        const outer = [
-            [28, 0],
-            [24, -7],
-            [16, -12.5],
-            [5, -14.5],
-            [-7, -14],
-            [-17, -11],
-            [-24, -5],
-            [-27, 0],
-            [-23, 6],
-            [-15, 12],
-            [-4, 14],
-            [7, 13.5],
-            [17, 10.5],
-            [24, 5],
-        ].map(([along, across], index) => [
-            along + variation(index + (eyeIndex * 19), 0.42),
-            across + (hand * Math.sin((index / 14) * TAU)),
-        ]);
-        const redRing = [
-            [21.5, 0],
-            [18, -6],
-            [10, -9.5],
-            [-2, -10.5],
-            [-12, -8.5],
-            [-19, -4],
-            [-21, 1],
-            [-17, 6.5],
-            [-9, 9.5],
-            [2, 10],
-            [12, 7.5],
-            [19, 3.5],
-        ];
-        const innerWhite = [
-            [15.5, 0],
-            [12.5, -4.7],
-            [5.5, -6.5],
-            [-3.5, -6.2],
-            [-10, -3.5],
-            [-14, 1],
-            [-10, 4.2],
-            [-3, 6],
-            [5.5, 5.7],
-            [12, 3],
-        ];
-        const tipCut = (index, count) => {
-            const progress = index / count;
-            const tipDistance = Math.min(
-                progress,
-                1 - progress,
-                Math.abs(progress - 0.5),
-            );
-
-            if (tipDistance > 0.045) return null;
-
-            return index % 2 === 0
-                ? { length: 0.72, startWidth: 0.56, endWidth: 0.88 }
-                : { length: 0.72, startWidth: 0.88, endWidth: 0.56 };
+    drawSplatter(visual) {
+        const intensity = clamp(visual.energy + (visual.reaction * 0.65), 0.12, 1.2);
+        const count = 8 + Math.round(intensity * 8);
+        const trailing = {
+            x: -visual.forward.x,
+            y: -visual.forward.y,
         };
 
-        drawTilePath(
-            this.context,
-            authoredLocalPath(center, forward, right, outer, this.scale),
-            TILE_WHITE,
-            this.scale,
-            60000 + (eyeIndex * 1000),
-            true,
-            tipCut,
-        );
-        drawTilePath(
-            this.context,
-            authoredLocalPath(center, forward, right, redRing, this.scale),
-            (seed) => colorFor(seed),
-            this.scale,
-            61000 + (eyeIndex * 1000),
-            true,
-            tipCut,
-        );
-        drawTilePath(
-            this.context,
-            authoredLocalPath(center, forward, right, innerWhite, this.scale),
-            TILE_WHITE,
-            this.scale,
-            62000 + (eyeIndex * 1000),
-            true,
-        );
+        this.context.save();
+        this.context.fillStyle = INK;
 
-        const pupilPositions = [
-            [-7.9, 0],
-            [-2.65, -2.65],
-            [-2.65, 2.65],
-            [2.65, -2.65],
-            [2.65, 2.65],
-            [7.9, 0],
-        ];
+        for (let index = 0; index < count; index += 1) {
+            const side = signedNoise(6500 + index);
+            const distanceAlong = (42 + (noise(6600 + index) * 94)) * this.scale;
+            const distanceAcross = side * (28 + (noise(6700 + index) * 78)) * this.scale;
+            const center = {
+                x: visual.center.x
+                    + (trailing.x * distanceAlong)
+                    + (visual.right.x * distanceAcross),
+                y: visual.center.y
+                    + (trailing.y * distanceAlong)
+                    + (visual.right.y * distanceAcross),
+            };
+            const radius = (0.45 + (noise(6800 + index) * 1.65)) * this.scale * intensity;
 
-        pupilPositions.forEach(([along, across], index) => {
-            drawTile(
-                this.context,
-                localPoint(
-                    center,
-                    forward,
-                    right,
-                    along * this.scale,
-                    across * this.scale,
-                ),
-                Math.atan2(forward.y, forward.x) + variation(index + eyeIndex, 0.025),
-                EYE_BLACK,
-                this.scale,
-            );
-        });
+            this.context.beginPath();
+            this.context.arc(center.x, center.y, radius, 0, TAU);
+            this.context.globalAlpha = 0.32 + (noise(6900 + index) * 0.6);
+            this.context.fill();
+        }
+
+        this.context.restore();
     }
 }

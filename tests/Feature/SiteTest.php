@@ -33,12 +33,12 @@ class SiteTest extends TestCase
             ->assertSee('id="academic-appointments"', false);
     }
 
-    public function test_mosaic_octopus_is_isolated_and_accessible(): void
+    public function test_ink_octopus_is_isolated_and_accessible(): void
     {
         $this->get('/')
-            ->assertSee('data-mosaic-octopus', false)
+            ->assertSee('data-ink-octopus', false)
             ->assertSee('data-octopus-canvas', false)
             ->assertSee('aria-hidden="true"', false)
-            ->assertSee('aria-label="Play with the mosaic octopus"', false);
+            ->assertSee('aria-label="Play with the ink octopus"', false);
     }
 }
