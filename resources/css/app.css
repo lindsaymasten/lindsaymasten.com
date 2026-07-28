@@ -61,6 +61,57 @@ a:hover {
     transform: translateY(0);
 }
 
+.mosaic-octopus {
+    position: fixed;
+    z-index: 8;
+    inset: 0;
+    overflow: hidden;
+    contain: strict;
+    pointer-events: none;
+}
+
+.mosaic-octopus[hidden] {
+    display: none;
+}
+
+.mosaic-octopus__canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.mosaic-octopus__trigger {
+    position: fixed;
+    top: .75rem;
+    left: .75rem;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.mosaic-octopus__trigger:focus-visible {
+    z-index: 30;
+    width: auto;
+    height: auto;
+    padding: .55rem .75rem;
+    border: 1px solid #8f241c;
+    clip-path: none;
+    color: var(--paper);
+    background: #8f241c;
+    font: 400 .8rem/1 var(--font-text);
+}
+
+@media (prefers-reduced-motion: reduce), print {
+    .mosaic-octopus {
+        display: none !important;
+    }
+}
+
 .cv-grid {
     display: grid;
     grid-template-columns: minmax(9rem, 1fr) 6.5rem minmax(0, 39rem) minmax(2rem, .5fr);

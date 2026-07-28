@@ -19,5 +19,21 @@
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
     @yield('content')
+
+    <div class="mosaic-octopus" data-mosaic-octopus hidden>
+        <canvas
+            class="mosaic-octopus__canvas"
+            data-octopus-canvas
+            width="1"
+            height="1"
+            aria-hidden="true"
+        ></canvas>
+        <button
+            class="mosaic-octopus__trigger"
+            data-octopus-trigger
+            type="button"
+            aria-label="Play with the mosaic octopus"
+        >Play with the mosaic octopus</button>
+    </div>
 </body>
 </html>

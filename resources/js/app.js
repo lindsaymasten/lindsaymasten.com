@@ -1,5 +1,24 @@
 document.documentElement.classList.add('has-js');
 
+const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+const savesData = navigator.connection?.saveData === true;
+
+if (!motionPreference.matches && !savesData) {
+    const loadOctopus = () => {
+        import('./octopus.js')
+            .then(({ initMosaicOctopus }) => initMosaicOctopus())
+            .catch(() => {
+                document.querySelector('[data-mosaic-octopus]')?.setAttribute('hidden', '');
+            });
+    };
+
+    if (document.readyState !== 'loading') {
+        loadOctopus();
+    } else {
+        document.addEventListener('DOMContentLoaded', loadOctopus, { once: true });
+    }
+}
+
 const index = document.querySelector('[data-cv-index]');
 
 if (index) {
