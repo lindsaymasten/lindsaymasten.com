@@ -31,6 +31,11 @@ const noise = (seed) => {
     return value - Math.floor(value);
 };
 const signedNoise = (seed) => (noise(seed) * 2) - 1;
+const flowingContour = (progress, seed, phase) => (
+    (Math.sin((progress * 19.7) + (seed * 0.031) + (phase * 0.72)) * 0.58)
+    + (Math.sin((progress * 43.1) + (seed * 0.017) - (phase * 0.37)) * 0.29)
+    + (Math.cos((progress * 71.3) - (seed * 0.009) + (phase * 0.19)) * 0.13)
+);
 
 function softenPolyline(points, iterations = 2) {
     let softened = points.map((point) => ({ ...point }));
@@ -214,22 +219,30 @@ function traceSmoothPath(context, points, close = false) {
     if (close) context.closePath();
 }
 
-function traceArm(context, frames, seed, scale) {
+function traceArm(context, frames, seed, scale, inkPhase = 0) {
     const left = [];
     const right = [];
 
     frames.forEach((frame, index) => {
-        const contour = signedNoise(seed + (index * 19.7)) * (1.25 + (0.72 * scale));
-        const pressure = 1 + (signedNoise(seed + (index * 7.1)) * 0.025);
-        const width = Math.max(1.6 * scale, (frame.width * pressure) + contour);
+        const progress = index / Math.max(1, frames.length - 1);
+        const leftContour = flowingContour(progress, seed, inkPhase)
+            * (1.35 + (0.9 * scale));
+        const rightContour = flowingContour(progress, seed + 127, inkPhase + 1.7)
+            * (1.35 + (0.9 * scale));
+        const pressure = 1 + (
+            Math.sin((progress * 8.2) + (seed * 0.013) - (inkPhase * 0.24))
+            * 0.045
+        );
+        const leftWidth = Math.max(1.6 * scale, (frame.width * pressure) + leftContour);
+        const rightWidth = Math.max(1.6 * scale, (frame.width * pressure) + rightContour);
 
         left.push({
-            x: frame.point.x + (frame.normal.x * width),
-            y: frame.point.y + (frame.normal.y * width),
+            x: frame.point.x + (frame.normal.x * leftWidth),
+            y: frame.point.y + (frame.normal.y * leftWidth),
         });
         right.push({
-            x: frame.point.x - (frame.normal.x * width),
-            y: frame.point.y - (frame.normal.y * width),
+            x: frame.point.x - (frame.normal.x * rightWidth),
+            y: frame.point.y - (frame.normal.y * rightWidth),
         });
     });
 
@@ -251,21 +264,26 @@ function traceMantle(context, visual, scale) {
         const along = (4 * scale) + (visual.length * progress);
         const leftWidth = visual.width * profile * (1 + asymmetry);
         const rightWidth = visual.width * profile * (1 - (asymmetry * 0.66));
-        const contour = signedNoise(8100 + (index * 13)) * 1.55 * scale;
+        const contour = flowingContour(progress, 8100, visual.inkPhase)
+            * 2.15
+            * scale;
+        const opposingContour = flowingContour(progress, 9100, visual.inkPhase + 2.2)
+            * 2.15
+            * scale;
 
         left.push(localPoint(
             visual.center,
             visual.forward,
             visual.right,
-            along + (signedNoise(9100 + index) * 0.5 * scale),
+            along + (Math.sin((progress * 16) + visual.inkPhase) * 0.7 * scale),
             -leftWidth + bend - contour,
         ));
         right.push(localPoint(
             visual.center,
             visual.forward,
             visual.right,
-            along + (signedNoise(10100 + index) * 0.5 * scale),
-            rightWidth + bend + contour,
+            along + (Math.cos((progress * 14) - visual.inkPhase) * 0.7 * scale),
+            rightWidth + bend + opposingContour,
         ));
     }
 
@@ -292,10 +310,15 @@ export class InkSkin {
     constructor(context) {
         this.context = context;
         this.scale = 1;
+        this.inkPhase = 0;
     }
 
     setScale(scale) {
         this.scale = scale;
+    }
+
+    setInkPhase(phase) {
+        this.inkPhase = phase;
     }
 
     prepareArm(arm, halfWidth) {
@@ -307,19 +330,56 @@ export class InkSkin {
 
     drawArm(prepared) {
         const { arm, frames } = prepared;
-        const seed = 1000 + (arm.index * 311) + ((arm.stepIndex ?? 0) * 17);
+        const seed = 1000 + (arm.index * 311);
 
         this.context.save();
-        traceArm(this.context, frames, seed, this.scale);
+        if ('filter' in this.context) {
+            this.context.filter = `blur(${1.25 * this.scale}px)`;
+        }
+        this.context.globalAlpha = 0.38;
+        traceArm(this.context, frames, seed, this.scale, this.inkPhase + 0.2);
+        this.context.fillStyle = INK;
+        this.context.fill();
+        this.context.restore();
+
+        this.context.save();
+        traceArm(this.context, frames, seed, this.scale, this.inkPhase);
         this.context.fillStyle = arm.index % 3 === 0 ? INK_SOFT : INK;
         this.context.fill();
 
-        traceArm(this.context, frames, seed, this.scale);
+        traceArm(this.context, frames, seed, this.scale, this.inkPhase);
         this.context.clip();
         this.drawArmDryBrush(frames, seed);
         this.context.restore();
 
+        this.drawInkBeads(frames, seed);
         this.drawSuckers(arm, frames, seed);
+    }
+
+    drawInkBeads(frames, seed) {
+        this.context.save();
+        this.context.fillStyle = INK;
+
+        for (let index = 7; index < frames.length - 3; index += 9) {
+            const frame = frames[index];
+            const side = signedNoise(seed + (index * 5)) < 0 ? -1 : 1;
+            const pulse = 0.78 + (
+                Math.sin(this.inkPhase + (index * 0.61) + seed) * 0.22
+            );
+            const radius = (0.65 + (noise(seed + index) * 1.35)) * this.scale * pulse;
+            const offset = (frame.width + (radius * 0.45)) * side;
+            const center = {
+                x: frame.point.x + (frame.normal.x * offset),
+                y: frame.point.y + (frame.normal.y * offset),
+            };
+
+            this.context.beginPath();
+            this.context.arc(center.x, center.y, radius, 0, TAU);
+            this.context.globalAlpha = 0.56 + (noise(seed + index + 3) * 0.4);
+            this.context.fill();
+        }
+
+        this.context.restore();
     }
 
     drawArmDryBrush(frames, seed) {
@@ -332,11 +392,17 @@ export class InkSkin {
             const start = 5 + ((lane + 1) * 3);
             const points = frames.slice(start, frames.length - 4).map((frame, index) => {
                 const skip = 0.58 + (noise(seed + (index * 7) + lane) * 0.42);
+                const flow = Math.sin(
+                    this.inkPhase
+                    + (index * 0.22)
+                    + (lane * 1.7)
+                    + (seed * 0.01),
+                ) * 0.075;
                 return {
                     x: frame.point.x
-                        + (frame.normal.x * frame.width * offsetFactor * skip),
+                        + (frame.normal.x * frame.width * (offsetFactor + flow) * skip),
                     y: frame.point.y
-                        + (frame.normal.y * frame.width * offsetFactor * skip),
+                        + (frame.normal.y * frame.width * (offsetFactor + flow) * skip),
                 };
             });
 
@@ -412,20 +478,65 @@ export class InkSkin {
         const right = { x: -forward.y, y: forward.x };
         const points = Array.from({ length: 28 }, (_, index) => {
             const angle = (index / 28) * TAU;
-            const radius = (42 + (signedNoise(2200 + (index * 9)) * 4.6)) * this.scale;
+            const flow = Math.sin((index * 1.43) + (this.inkPhase * 0.66)) * 3.1;
+            const radius = (
+                44
+                + flow
+                + (signedNoise(2200 + (index * 9)) * 4.8)
+            ) * this.scale;
             const along = Math.cos(angle) * radius * 0.88;
             const across = Math.sin(angle) * radius;
 
             return localPoint(center, forward, right, along, across);
         });
 
+        this.context.save();
+        if ('filter' in this.context) {
+            this.context.filter = `blur(${1.8 * this.scale}px)`;
+        }
+        this.context.globalAlpha = 0.42;
+        traceSmoothPath(this.context, points, true);
+        this.context.fillStyle = INK;
+        this.context.fill();
+        this.context.restore();
+
         traceSmoothPath(this.context, points, true);
         this.context.fillStyle = INK;
         this.context.fill();
     }
 
-    drawRootTentacleLine() {
-        // Root details are integrated into each deforming sucker row.
+    drawRootTentacleLine(prepared, center) {
+        const { frames, arm } = prepared;
+        if (frames.length < 8) return;
+
+        const start = pointBetween(center, frames[0].point, 0.78);
+        const points = [
+            start,
+            ...frames.slice(0, 8).map((frame) => frame.point),
+        ];
+        const rootWidth = frames[0].width * (1.98 + ((arm.index % 3) * 0.035));
+
+        this.context.save();
+        this.context.lineCap = 'round';
+        this.context.lineJoin = 'round';
+        if ('filter' in this.context) {
+            this.context.filter = `blur(${1.4 * this.scale}px)`;
+        }
+        this.context.globalAlpha = 0.46;
+        traceSmoothPath(this.context, points);
+        this.context.strokeStyle = INK;
+        this.context.lineWidth = rootWidth * 1.08;
+        this.context.stroke();
+        this.context.restore();
+
+        this.context.save();
+        this.context.lineCap = 'round';
+        this.context.lineJoin = 'round';
+        traceSmoothPath(this.context, points);
+        this.context.strokeStyle = arm.index % 3 === 0 ? INK_SOFT : INK;
+        this.context.lineWidth = rootWidth * 0.96;
+        this.context.stroke();
+        this.context.restore();
     }
 
     drawFrontBridge() {
@@ -433,6 +544,16 @@ export class InkSkin {
     }
 
     drawMantle(visual) {
+        this.context.save();
+        if ('filter' in this.context) {
+            this.context.filter = `blur(${1.9 * this.scale}px)`;
+        }
+        this.context.globalAlpha = 0.46;
+        traceMantle(this.context, visual, this.scale);
+        this.context.fillStyle = INK;
+        this.context.fill();
+        this.context.restore();
+
         this.context.save();
         traceMantle(this.context, visual, this.scale);
         this.context.fillStyle = INK;
@@ -443,7 +564,6 @@ export class InkSkin {
         this.drawMantleTexture(visual);
         this.context.restore();
 
-        this.drawMantleOpenings(visual);
         this.drawEyes(visual);
         this.drawSplatter(visual);
     }
@@ -462,9 +582,18 @@ export class InkSkin {
                 visual.forward,
                 visual.right,
                 visual.length * progress,
-                visual.bend * Math.sin(progress * Math.PI),
+                (visual.bend * Math.sin(progress * Math.PI))
+                    + (
+                        Math.sin(visual.inkPhase + (index * 0.78))
+                        * 1.45
+                        * this.scale
+                    ),
             );
-            const radiusX = (4 + (noise(3400 + index) * 13)) * this.scale;
+            const radiusX = (
+                4
+                + (noise(3400 + index) * 13)
+                + (Math.sin((visual.inkPhase * 0.8) + index) * 1.2)
+            ) * this.scale;
             const radiusY = (0.5 + (noise(3500 + index) * 1.4)) * this.scale;
 
             drawIrregularOval(
@@ -483,12 +612,15 @@ export class InkSkin {
             const progress = 0.08 + (noise(4300 + index) * 0.84);
             const widthAtPoint = visual.width * (Math.sin(progress * Math.PI) ** 0.55);
             const across = signedNoise(4400 + index) * widthAtPoint * 0.78;
+            const flow = Math.sin((visual.inkPhase * 0.62) + (index * 1.37))
+                * 1.2
+                * this.scale;
             const center = localPoint(
                 visual.center,
                 visual.forward,
                 visual.right,
                 visual.length * progress,
-                across + (visual.bend * Math.sin(progress * Math.PI)),
+                across + flow + (visual.bend * Math.sin(progress * Math.PI)),
             );
             const radius = (0.3 + (noise(4500 + index) * 1.05)) * this.scale;
 
@@ -498,63 +630,6 @@ export class InkSkin {
             this.context.fill();
         }
 
-        this.context.restore();
-    }
-
-    drawMantleOpenings(visual) {
-        const heading = Math.atan2(visual.forward.y, visual.forward.x);
-        const loopCenter = localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            visual.length * 0.57,
-            (visual.width * -0.08) + (visual.bend * 0.72),
-        );
-
-        this.context.save();
-        this.context.globalCompositeOperation = 'destination-out';
-        this.context.strokeStyle = '#000';
-        this.context.lineCap = 'round';
-        this.context.beginPath();
-        this.context.ellipse(
-            loopCenter.x,
-            loopCenter.y,
-            visual.length * 0.19,
-            visual.width * 0.39,
-            heading + 0.08,
-            0.16 * Math.PI,
-            1.78 * Math.PI,
-        );
-        this.context.globalAlpha = 0.88;
-        this.context.lineWidth = (4.8 + (visual.energy * 1.8)) * this.scale;
-        this.context.stroke();
-
-        const slashStart = localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            visual.length * 0.2,
-            visual.width * 0.23,
-        );
-        const slashEnd = localPoint(
-            visual.center,
-            visual.forward,
-            visual.right,
-            visual.length * 0.46,
-            visual.width * 0.42,
-        );
-
-        this.context.beginPath();
-        this.context.moveTo(slashStart.x, slashStart.y);
-        this.context.quadraticCurveTo(
-            loopCenter.x - (visual.forward.x * 8 * this.scale),
-            loopCenter.y - (visual.forward.y * 8 * this.scale),
-            slashEnd.x,
-            slashEnd.y,
-        );
-        this.context.globalAlpha = 0.55;
-        this.context.lineWidth = 1.4 * this.scale;
-        this.context.stroke();
         this.context.restore();
     }
 

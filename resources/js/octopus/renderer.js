@@ -3,14 +3,14 @@ import { InkSkin } from './skin.js';
 
 const TAU = Math.PI * 2;
 const ARM_CONFIGS = [
-    { angle: 68, length: 1.06, width: 0.98, phase: 0.15, plantDuration: 980, swingDuration: 480, suckerSide: -1, layer: 3 },
-    { angle: 96, length: 1.17, width: 0.94, phase: 0.92, plantDuration: 1160, swingDuration: 560, suckerSide: 1, layer: 1 },
-    { angle: 126, length: 1.01, width: 1.07, phase: 1.68, plantDuration: 900, swingDuration: 450, suckerSide: -1, layer: 5 },
-    { angle: 157, length: 1.34, width: 1.12, phase: 2.44, plantDuration: 1100, swingDuration: 540, suckerSide: 1, layer: 0 },
-    { angle: 203, length: 1.31, width: 1.1, phase: 3.23, plantDuration: 940, swingDuration: 500, suckerSide: -1, layer: 2 },
-    { angle: 234, length: 1.0, width: 1.05, phase: 4.01, plantDuration: 1210, swingDuration: 590, suckerSide: 1, layer: 6 },
-    { angle: 264, length: 1.19, width: 0.96, phase: 4.79, plantDuration: 1030, swingDuration: 520, suckerSide: -1, layer: 4 },
-    { angle: 292, length: 1.04, width: 1.02, phase: 5.57, plantDuration: 860, swingDuration: 440, suckerSide: 1, layer: 7 },
+    { angle: 68, length: 1.06, width: 0.98, phase: 0.15, plantDuration: 1880, swingDuration: 1040, suckerSide: -1, layer: 3 },
+    { angle: 96, length: 1.17, width: 0.94, phase: 0.92, plantDuration: 2180, swingDuration: 1220, suckerSide: 1, layer: 1 },
+    { angle: 126, length: 1.01, width: 1.07, phase: 1.68, plantDuration: 1760, swingDuration: 980, suckerSide: -1, layer: 5 },
+    { angle: 157, length: 1.34, width: 1.12, phase: 2.44, plantDuration: 2100, swingDuration: 1180, suckerSide: 1, layer: 0 },
+    { angle: 203, length: 1.31, width: 1.1, phase: 3.23, plantDuration: 1820, swingDuration: 1080, suckerSide: -1, layer: 2 },
+    { angle: 234, length: 1.0, width: 1.05, phase: 4.01, plantDuration: 2260, swingDuration: 1280, suckerSide: 1, layer: 6 },
+    { angle: 264, length: 1.19, width: 0.96, phase: 4.79, plantDuration: 1980, swingDuration: 1140, suckerSide: -1, layer: 4 },
+    { angle: 292, length: 1.04, width: 1.02, phase: 5.57, plantDuration: 1700, swingDuration: 960, suckerSide: 1, layer: 7 },
 ];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -74,6 +74,7 @@ class InkOctopusRenderer {
         this.edgeRanks = [];
         this.armPull = { x: 0, y: 0 };
         this.autonomousPhase = 0;
+        this.inkPhase = 0;
         this.reaction = 0;
         this.running = false;
         this.paused = false;
@@ -133,7 +134,7 @@ class InkOctopusRenderer {
             const anchor = this.freeAnchor(config, length, root, timestamp / 1000, index);
             const arm = new CodepenArm(anchor, length, 30, root, config, index);
 
-            arm.rootHalfWidth = 15.25 * this.scale * config.width;
+            arm.rootHalfWidth = 16.25 * this.scale * config.width;
             arm.lastRoot = { ...root };
             arm.plantUntil = timestamp + 420 + (index * 140);
             arm.stepIndex = index;
@@ -144,6 +145,7 @@ class InkOctopusRenderer {
             arm.curlDirection = index % 2 === 0 ? 1 : -1;
             arm.associatedSwingAt = 0;
             arm.associatedStep = null;
+            arm.edgeHoldUntil = 0;
 
             return arm;
         });
@@ -168,16 +170,16 @@ class InkOctopusRenderer {
         const baseAngle = this.heading
             + ((config.angle * Math.PI) / 180)
             + landingSweep
-            + (Math.sin((seconds * 0.3) + config.phase) * 0.12);
+            + (Math.sin((seconds * 0.16) + config.phase) * 0.1);
         const extension = 0.7
-            + (0.15 * ((Math.sin((seconds * 0.28) + (config.phase * 1.31)) + 1) / 2));
+            + (0.14 * ((Math.sin((seconds * 0.15) + (config.phase * 1.31)) + 1) / 2));
         const speedAmount = clamp(speed / Math.max(1, 23 * this.scale), 0, 1);
         const forwardReach = hasMovement
             ? length * speedAmount * (0.07 + (0.09 * ((strideWave + 1) / 2)))
             : 0;
         const prediction = {
-            x: this.velocity.x * 2,
-            y: this.velocity.y * 2,
+            x: this.velocity.x * 0.85,
+            y: this.velocity.y * 0.85,
         };
         const desired = {
             x: root.x
@@ -281,11 +283,11 @@ class InkOctopusRenderer {
         const target = this.targetPoint();
         const errorX = target.x - this.body.x;
         const errorY = target.y - this.body.y;
-        const response = 1 - Math.pow(0.915, frameScale);
+        const response = 1 - Math.pow(0.9765, frameScale);
         let moveX = errorX * response;
         let moveY = errorY * response;
         const movement = Math.hypot(moveX, moveY);
-        const maximumStep = 23.5 * this.scale * frameScale;
+        const maximumStep = 5.5 * this.scale * frameScale;
 
         if (movement > maximumStep) {
             moveX = (moveX / movement) * maximumStep;
@@ -302,13 +304,13 @@ class InkOctopusRenderer {
 
         if (speed > 0.18) {
             const targetHeading = Math.atan2(this.velocity.y, this.velocity.x);
-            const turnResponse = 1 - Math.pow(0.87, frameScale);
+            const turnResponse = 1 - Math.pow(0.963, frameScale);
 
             this.heading += shortestAngle(this.heading, targetHeading) * turnResponse;
         }
 
-        this.lastSpeed = lerp(this.lastSpeed, speed, 0.12 * frameScale);
-        this.autonomousPhase += 0.0085 * frameScale;
+        this.lastSpeed = lerp(this.lastSpeed, speed, 0.065 * frameScale);
+        this.autonomousPhase += 0.0032 * frameScale;
     }
 
     clampBody() {
@@ -336,7 +338,7 @@ class InkOctopusRenderer {
 
     updateActiveEdge() {
         const pointerEdge = this.pointer.active
-            ? this.nearestEdge(this.pointer, 28 * this.scale)
+            ? this.nearestEdge(this.pointer, 38 * this.scale)
             : null;
         const bodyEdge = this.nearestEdge(this.body, this.clearance + (3 * this.scale));
 
@@ -383,15 +385,15 @@ class InkOctopusRenderer {
             const tangentVelocity = (this.velocity.x * tangent.x) + (this.velocity.y * tangent.y);
             const along = ((edgeRank - 1) * 58 * this.scale)
                 + (Math.sin(
-                    (seconds * 0.62)
+                    (seconds * 0.28)
                     + arm.config.phase
                     + (arm.stepIndex * 1.37),
-                ) * 38 * this.scale)
-                + (tangentVelocity * 3.1);
+                ) * 32 * this.scale)
+                + (tangentVelocity * 2.2);
 
             return this.constrainAnchor(
                 root,
-                this.pointOnEdge(this.activeEdge, along, 7 * this.scale),
+                this.pointOnEdge(this.activeEdge, along, 2.5 * this.scale),
                 arm.l * 0.94,
             );
         }
@@ -427,8 +429,8 @@ class InkOctopusRenderer {
         arm.state = 'swinging';
         arm.swingStarted = timestamp;
         arm.swingDuration = clamp(
-            arm.config.swingDuration / (1 + (speed * 0.006)),
-            arm.config.swingDuration * 0.78,
+            arm.config.swingDuration / (1 + (speed * 0.003)),
+            arm.config.swingDuration * 0.88,
             arm.config.swingDuration,
         );
         arm.swingFrom = arm.anchor();
@@ -461,7 +463,7 @@ class InkOctopusRenderer {
             const partner = this.arms[partnerIndex];
 
             if (partner?.state === 'planted') {
-                partner.associatedSwingAt = timestamp + 175;
+                partner.associatedSwingAt = timestamp + 320;
                 partner.associatedStep = arm.stepIndex;
             }
         }
@@ -470,7 +472,7 @@ class InkOctopusRenderer {
     updateSwing(arm, root, timestamp) {
         const rawProgress = clamp((timestamp - arm.swingStarted) / arm.swingDuration, 0, 1);
         const progress = smootherstep(rawProgress);
-        const lift = Math.sin(Math.PI * progress) * 21 * this.scale;
+        const lift = Math.sin(Math.PI * progress) * 13 * this.scale;
         const anchor = {
             x: lerp(arm.swingFrom.x, arm.swingTo.x, progress) + (arm.swingNormal.x * lift),
             y: lerp(arm.swingFrom.y, arm.swingTo.y, progress) + (arm.swingNormal.y * lift),
@@ -483,7 +485,12 @@ class InkOctopusRenderer {
         if (rawProgress >= 1) {
             arm.state = 'planted';
             arm.setAnchor(this.constrainAnchor(root, arm.swingTo, arm.l * 0.94));
-            arm.plantUntil = timestamp + arm.config.plantDuration;
+            const edgeHold = arm.edge
+                ? 760 + (pseudoRandom((arm.index + 1) * 17.3) * 620)
+                : 0;
+
+            arm.edgeHoldUntil = timestamp + edgeHold;
+            arm.plantUntil = timestamp + arm.config.plantDuration + edgeHold;
         }
     }
 
@@ -504,14 +511,16 @@ class InkOctopusRenderer {
             } else {
                 const strain = distanceBetween(arm.anchor(), root) / arm.l;
                 const desired = this.desiredAnchor(arm, root, seconds);
-                const edgeMismatch = this.activeEdge
+                const edgeHolding = timestamp < (arm.edgeHoldUntil ?? 0);
+                const edgeMismatch = !edgeHolding
+                    && this.activeEdge
                     && this.edgeRanks.includes(arm.index)
                     && distanceBetween(arm.anchor(), desired) > 44 * this.scale;
                 const due = timestamp >= arm.plantUntil;
                 const associatedDue = arm.associatedSwingAt > 0
                     && timestamp >= arm.associatedSwingAt;
 
-                if (associatedDue && swinging < 3) {
+                if (associatedDue && swinging < 2) {
                     if (Number.isFinite(arm.associatedStep)) {
                         arm.stepIndex = Math.max(arm.stepIndex, arm.associatedStep - 1);
                     }
@@ -521,7 +530,11 @@ class InkOctopusRenderer {
                     this.startSwing(arm, root, timestamp, seconds, false);
                     swinging += 1;
                     this.updateSwing(arm, root, timestamp);
-                } else if (strain > 0.86 || edgeMismatch || (due && swinging < 3)) {
+                } else if (
+                    strain > (edgeHolding ? 0.95 : 0.88)
+                    || edgeMismatch
+                    || (due && swinging < 2)
+                ) {
                     arm.associatedSwingAt = 0;
                     arm.associatedStep = null;
                     this.startSwing(arm, root, timestamp, seconds, true);
@@ -535,7 +548,7 @@ class InkOctopusRenderer {
             arm.curlAmount = lerp(
                 arm.curlAmount ?? 0,
                 arm.curlTarget ?? 0,
-                0.045,
+                0.022,
             );
         });
 
@@ -565,8 +578,8 @@ class InkOctopusRenderer {
             longitudinal /= total;
         }
 
-        this.armPull.x = lerp(this.armPull.x, longitudinal, 0.1);
-        this.armPull.y = lerp(this.armPull.y, lateral, 0.1);
+        this.armPull.x = lerp(this.armPull.x, longitudinal, 0.055);
+        this.armPull.y = lerp(this.armPull.y, lateral, 0.055);
     }
 
     update(timestamp, elapsed) {
@@ -577,6 +590,7 @@ class InkOctopusRenderer {
         this.updateBody(frameScale);
         this.updateActiveEdge();
         this.updateArms(timestamp);
+        this.inkPhase += 0.0042 * frameScale;
         this.reaction = Math.max(0, this.reaction - (0.028 * frameScale));
     }
 
@@ -593,6 +607,7 @@ class InkOctopusRenderer {
             forward,
             right,
             phase: this.autonomousPhase,
+            inkPhase: this.inkPhase,
             energy: speedAmount,
             reaction: this.reaction,
             length: this.mantleLength * (
@@ -626,9 +641,10 @@ class InkOctopusRenderer {
             .map((arm) => this.skin.prepareArm(arm, arm.rootHalfWidth))
             .sort((first, second) => first.arm.config.layer - second.arm.config.layer);
 
+        this.skin.setInkPhase(this.inkPhase);
         preparedArms.forEach((arm) => this.skin.drawArm(arm));
         this.skin.drawWeb(this.body, this.heading);
-        preparedArms.forEach((arm) => this.skin.drawRootTentacleLine(arm));
+        preparedArms.forEach((arm) => this.skin.drawRootTentacleLine(arm, this.body));
         this.skin.drawFrontBridge(preparedArms, this.body, this.heading);
         this.skin.drawMantle(this.bodyVisual());
         this.context.globalAlpha = 1;
