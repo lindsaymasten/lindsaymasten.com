@@ -130,6 +130,10 @@ a:hover {
     transition: opacity 140ms ease;
 }
 
+.ink-octopus__cross-soft-leg {
+    filter: blur(.32px);
+}
+
 .ink-octopus__toggle[aria-pressed="true"] .ink-octopus__cross {
     opacity: 0;
 }
