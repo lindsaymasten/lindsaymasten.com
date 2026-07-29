@@ -124,7 +124,7 @@ a:hover {
 }
 
 .ink-octopus__cross {
-    transform: translateY(-2px) rotate(-19deg);
+    transform: translate(-20%, -30%) rotate(-19deg);
     transform-box: fill-box;
     transform-origin: center;
     transition: opacity 140ms ease;
