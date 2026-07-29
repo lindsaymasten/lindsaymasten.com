@@ -83,30 +83,50 @@ a:hover {
     will-change: filter;
 }
 
-.ink-octopus__trigger {
+.ink-octopus__toggle {
     position: fixed;
-    top: .75rem;
-    left: .75rem;
-    width: 1px;
-    height: 1px;
+    z-index: 12;
+    right: .875rem;
+    bottom: .875rem;
+    display: grid;
+    width: 2.5rem;
+    height: 2.5rem;
     padding: 0;
-    border: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    place-items: center;
+    border: 1px solid #000;
+    border-radius: 0;
+    color: #fff;
+    background: #000;
+    cursor: pointer;
     pointer-events: auto;
+    transition: background-color 160ms ease, transform 160ms ease;
 }
 
-.ink-octopus__trigger:focus-visible {
-    z-index: 30;
-    width: auto;
-    height: auto;
-    padding: .55rem .75rem;
-    border: 1px solid var(--ink);
-    clip-path: none;
-    color: var(--paper);
-    background: var(--ink);
-    font: 400 .8rem/1 var(--font-text);
+.ink-octopus__toggle:hover {
+    background: #262321;
+}
+
+.ink-octopus__toggle:active {
+    transform: translateY(1px);
+}
+
+.ink-octopus__toggle:focus-visible {
+    outline: 2px solid #ed4a2b;
+    outline-offset: 3px;
+}
+
+.ink-octopus__toggle svg {
+    display: block;
+    width: 1.85rem;
+    height: 1.85rem;
+}
+
+.ink-octopus__cross {
+    transition: opacity 140ms ease;
+}
+
+.ink-octopus__toggle[aria-pressed="true"] .ink-octopus__cross {
+    opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce), print {

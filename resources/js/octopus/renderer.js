@@ -76,6 +76,7 @@ class InkOctopusRenderer {
         this.autonomousPhase = 0;
         this.inkPhase = 0;
         this.reaction = 0;
+        this.parked = false;
         this.running = false;
         this.paused = false;
         this.initialized = false;
@@ -107,9 +108,13 @@ class InkOctopusRenderer {
             return;
         }
 
-        this.body.x = (this.body.x / Math.max(1, previousWidth)) * this.width;
-        this.body.y = (this.body.y / Math.max(1, previousHeight)) * this.height;
-        this.clampBody();
+        if (this.parked) {
+            this.body = this.targetPoint();
+        } else {
+            this.body.x = (this.body.x / Math.max(1, previousWidth)) * this.width;
+            this.body.y = (this.body.y / Math.max(1, previousHeight)) * this.height;
+            this.clampBody();
+        }
         this.lastBody = { ...this.body };
         this.createArms(performance.now());
     }
@@ -161,6 +166,22 @@ class InkOctopusRenderer {
     }
 
     freeAnchor(config, length, root, seconds, stepIndex = 0) {
+        if (this.parked) {
+            const tuckedAngle = (((config.angle - 180) * Math.PI) / 180)
+                + (Math.sin((seconds * 0.22) + config.phase) * 0.11);
+            const tuckedExtension = 0.25
+                + (0.035 * ((Math.sin((seconds * 0.18) + config.phase) + 1) / 2));
+
+            return this.constrainAnchor(
+                root,
+                {
+                    x: root.x + (Math.cos(tuckedAngle) * length * tuckedExtension),
+                    y: root.y + (Math.sin(tuckedAngle) * length * tuckedExtension),
+                },
+                length * 0.42,
+            );
+        }
+
         const movementAngle = Math.atan2(this.velocity.y, this.velocity.x);
         const speed = Math.hypot(this.velocity.x, this.velocity.y);
         const hasMovement = speed > 0.2;
@@ -209,6 +230,23 @@ class InkOctopusRenderer {
         this.reaction = clamp(this.reaction + intensity, 0, 1.5);
     }
 
+    setParked(parked) {
+        const nextParked = Boolean(parked);
+
+        if (this.parked === nextParked) return;
+
+        this.parked = nextParked;
+        this.pointer.active = false;
+        this.reaction = Math.max(this.reaction, 0.35);
+
+        const timestamp = performance.now();
+
+        this.arms.forEach((arm, index) => {
+            arm.edgeHoldUntil = 0;
+            arm.plantUntil = Math.min(arm.plantUntil, timestamp + (index * 55));
+        });
+    }
+
     setPaused(paused) {
         this.paused = paused;
 
@@ -255,6 +293,17 @@ class InkOctopusRenderer {
     }
 
     targetPoint() {
+        if (this.parked) {
+            return {
+                x: this.width
+                    - (34 * this.scale)
+                    + (Math.sin(this.autonomousPhase * 1.7) * 5 * this.scale),
+                y: this.height
+                    + (68 * this.scale)
+                    + (Math.cos(this.autonomousPhase * 1.35) * 4 * this.scale),
+            };
+        }
+
         if (this.pointer.active) {
             return {
                 x: clamp(this.pointer.x, this.clearance, this.width - this.clearance),
@@ -287,7 +336,7 @@ class InkOctopusRenderer {
         let moveX = errorX * response;
         let moveY = errorY * response;
         const movement = Math.hypot(moveX, moveY);
-        const maximumStep = 5.5 * this.scale * frameScale;
+        const maximumStep = (this.parked ? 7.2 : 5.5) * this.scale * frameScale;
 
         if (movement > maximumStep) {
             moveX = (moveX / movement) * maximumStep;
@@ -296,7 +345,7 @@ class InkOctopusRenderer {
 
         this.body.x += moveX;
         this.body.y += moveY;
-        this.clampBody();
+        if (!this.parked) this.clampBody();
         this.velocity.x = (this.body.x - this.lastBody.x) / Math.max(0.35, frameScale);
         this.velocity.y = (this.body.y - this.lastBody.y) / Math.max(0.35, frameScale);
 
@@ -337,6 +386,12 @@ class InkOctopusRenderer {
     }
 
     updateActiveEdge() {
+        if (this.parked) {
+            this.activeEdge = null;
+            this.edgeRanks = [];
+            return;
+        }
+
         const pointerEdge = this.pointer.active
             ? this.nearestEdge(this.pointer, 38 * this.scale)
             : null;
@@ -412,6 +467,8 @@ class InkOctopusRenderer {
             }
             : desired;
         const margin = 7 * this.scale;
+
+        if (this.parked) return constrained;
 
         return {
             x: clamp(constrained.x, margin, this.width - margin),

@@ -20,6 +20,8 @@ self.addEventListener('message', (event) => {
         renderer.clearPointer();
     } else if (message.type === 'action') {
         renderer.trigger(message.intensity);
+    } else if (message.type === 'park') {
+        renderer.setParked(message.parked);
     } else if (message.type === 'resize') {
         renderer.resize(message.width, message.height, message.density);
     } else if (message.type === 'pause') {
