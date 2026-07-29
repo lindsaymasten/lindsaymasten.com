@@ -4,7 +4,7 @@
 
 @section('content')
 <header class="cv-masthead cv-grid" id="top">
-    <a class="cv-masthead__title" href="#top" aria-label="Return to the top of the curriculum vitae">Curriculum Vitae</a>
+    <a class="cv-masthead__title" href="#top" aria-label="Return to the top of the curriculum vitae">Lindsay Masten</a>
 
     <div class="cv-masthead__tools">
         <details class="cv-index" data-cv-index>
@@ -22,13 +22,17 @@
 <main id="main-content">
     <section class="cv-intro cv-grid" aria-labelledby="cv-name">
         <div class="cv-intro__content">
-            <h1 id="cv-name">Lindsay Masten</h1>
+            <h1 id="cv-name">Curriculum Vitae</h1>
             <p class="cv-intro__roles">Professor of Graphic Design &amp; New Art<br>Chair, Visual Arts Department, Yavapai College<br>Partner and Creative Director, Web &amp; Wolf</p>
             <address class="cv-intro__contact">
                 <span>Also find me at</span>
                 <a class="cv-intro__agency" href="https://webandwolf.com/" rel="external">
                     <span>webandwolf.com</span>
                     <img src="{{ asset('webandwolf-favicon.svg') }}" alt="" width="24" height="24">
+                </a>
+                <a class="cv-intro__agency" href="https://readthreshold.org/" rel="external">
+                    <span>readthreshold.org</span>
+                    <img src="{{ asset('threshold-favicon.svg') }}" alt="" width="24" height="24">
                 </a>
             </address>
         </div>

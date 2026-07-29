@@ -22,7 +22,9 @@ class SiteTest extends TestCase
         $this->get('/cv')
             ->assertSee('Professor of Graphic Design &amp; New Art', false)
             ->assertSee('Department Chair, Visual Arts Department')
-            ->assertSee('Partner and Creative Director');
+            ->assertSee('Partner and Creative Director')
+            ->assertSee('href="https://readthreshold.org/"', false)
+            ->assertSee('readthreshold.org');
     }
 
     public function test_cv_entries_are_rendered_with_the_editorial_date_column(): void
