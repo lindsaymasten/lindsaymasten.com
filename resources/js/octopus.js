@@ -83,9 +83,10 @@ export async function initInkOctopus() {
 
     const canvas = layer.querySelector('[data-octopus-canvas]');
     const toggle = layer.querySelector('[data-octopus-toggle]');
+    const parkedMarker = layer.querySelector('[data-octopus-parked-marker]');
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-    if (!canvas || !toggle || motionPreference.matches) return;
+    if (!canvas || !toggle || !parkedMarker || motionPreference.matches) return;
 
     layer.dataset.initialized = 'true';
     layer.removeAttribute('hidden');
@@ -120,6 +121,7 @@ export async function initInkOctopus() {
         if (!parked) renderBridge.pointerLeave();
 
         layer.classList.toggle('is-parked', parked);
+        parkedMarker.hidden = !parked;
         toggle.setAttribute('aria-pressed', String(parked));
         toggle.setAttribute(
             'aria-label',
@@ -147,6 +149,7 @@ export async function initInkOctopus() {
         if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
         renderBridge.destroy();
         layer.setAttribute('hidden', '');
+        parkedMarker.hidden = true;
         document.removeEventListener('visibilitychange', handleVisibility);
         window.removeEventListener('pointermove', handlePointerMove);
         window.removeEventListener('pointerdown', handlePointerDown);

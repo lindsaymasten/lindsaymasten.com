@@ -42,6 +42,8 @@ class SiteTest extends TestCase
             ->assertSee('data-octopus-canvas', false)
             ->assertSee('aria-hidden="true"', false)
             ->assertSee('data-octopus-toggle', false)
+            ->assertSee('data-octopus-parked-marker', false)
+            ->assertSee('Octopus parked')
             ->assertSee('aria-label="Put the octopus away"', false)
             ->assertSee('aria-pressed="false"', false);
     }
