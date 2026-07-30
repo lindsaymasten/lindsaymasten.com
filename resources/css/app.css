@@ -93,11 +93,21 @@ a:hover {
     will-change: filter;
 }
 
-.ink-octopus__parked-marker {
+.ink-octopus__controls {
     position: fixed;
-    z-index: 11;
-    right: calc(.875rem + 2.5rem + .375rem);
-    bottom: calc(.875rem + 2.5rem + .375rem);
+    z-index: 12;
+    right: .875rem;
+    bottom: .875rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    pointer-events: none;
+}
+
+.ink-octopus__parked-marker {
+    position: absolute;
+    z-index: 0;
+    top: calc(-1rem - .95em);
+    left: calc(-1rem - .95em);
     color: #000;
     font-family: var(--font-display);
     font-size: 1.06rem;
@@ -142,6 +152,7 @@ a:hover {
     font-size: 1.52em;
     font-weight: 400;
     line-height: 1;
+    transform: translateY(-.32em);
 }
 
 .ink-octopus__parked-word {
@@ -168,10 +179,9 @@ a:hover {
 }
 
 .ink-octopus__toggle {
-    position: fixed;
-    z-index: 12;
-    right: .875rem;
-    bottom: .875rem;
+    position: absolute;
+    z-index: 1;
+    inset: 0;
     display: grid;
     width: 2.5rem;
     height: 2.5rem;
