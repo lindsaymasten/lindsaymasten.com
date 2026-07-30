@@ -100,7 +100,7 @@ a:hover {
     cursor: pointer;
     overflow: visible;
     pointer-events: auto;
-    transition: background-color 160ms ease, transform 160ms ease;
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .ink-octopus__toggle:hover {
@@ -114,6 +114,11 @@ a:hover {
 .ink-octopus__toggle:focus-visible {
     outline: 2px solid #ed4a2b;
     outline-offset: 3px;
+}
+
+.ink-octopus__toggle[aria-pressed="true"] {
+    border-color: #ed4a2b;
+    background: #ed4a2b;
 }
 
 .ink-octopus__toggle svg {
