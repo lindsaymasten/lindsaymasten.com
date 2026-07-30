@@ -96,8 +96,8 @@ a:hover {
 .ink-octopus__parked-marker {
     position: fixed;
     z-index: 11;
-    right: calc(.875rem + 2.5rem + 1rem);
-    bottom: calc(.875rem + 2.5rem + 1rem);
+    right: calc(.875rem + 2.5rem + .375rem);
+    bottom: calc(.875rem + 2.5rem + .375rem);
     color: #000;
     font-family: var(--font-display);
     font-size: 1.06rem;
@@ -129,14 +129,17 @@ a:hover {
 
 .ink-octopus__parked-round-o {
     display: inline-grid;
-    width: .88em;
-    height: .88em;
-    margin-right: .07em;
-    margin-bottom: .015em;
+    width: .95em;
+    height: .95em;
     place-items: center;
     flex: 0 0 auto;
+    font-size: 1em;
+    line-height: 1;
+}
+
+.ink-octopus__parked-round-o > span {
     font-family: Arial, sans-serif;
-    font-size: 1.2em;
+    font-size: 1.52em;
     font-weight: 400;
     line-height: 1;
 }
@@ -149,6 +152,7 @@ a:hover {
     writing-mode: vertical-rl;
     text-orientation: mixed;
     transform: rotate(180deg);
+    line-height: .95;
 }
 
 .ink-octopus__parked-announcement {

@@ -37,7 +37,7 @@
         >
             <span class="ink-octopus__parked-visual" aria-hidden="true">
                 <span class="ink-octopus__parked-octopus">
-                    <span class="ink-octopus__parked-round-o">●</span><span>CTOPUS</span>
+                    <span class="ink-octopus__parked-round-o"><span>●</span></span><span>CTOPUS</span>
                 </span>
                 <span class="ink-octopus__parked-word">PARKED</span>
             </span>
