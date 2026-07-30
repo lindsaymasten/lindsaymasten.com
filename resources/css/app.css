@@ -30,6 +30,16 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+:where(h1, h2, h3, h4, h5, h6) {
+    text-wrap: balance;
+}
+
+:where(p, li) {
+    orphans: 3;
+    text-wrap: pretty;
+    widows: 3;
+}
+
 a {
     color: inherit;
     text-decoration-thickness: .055em;

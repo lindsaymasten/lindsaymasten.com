@@ -1,4 +1,8 @@
+import { initWidowControl } from './typography.js';
+
 document.documentElement.classList.add('has-js');
+
+initWidowControl();
 
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 const savesData = navigator.connection?.saveData === true;
